@@ -465,6 +465,7 @@ async def create_completion(request: CompletionRequest):
         stream=request.stream,
         stop=request.stop,
     )
+    logging.debug(f"Prepare payload : {payload}")
 
     error_check_ret = await check_length(
         request, payload["prompt"], payload["max_new_tokens"]
@@ -502,6 +503,8 @@ async def create_completion(request: CompletionRequest):
             task_usage = UsageInfo.parse_obj(content["usage"])
             for usage_key, usage_value in task_usage.dict().items():
                 setattr(usage, usage_key, getattr(usage, usage_key) + usage_value)
+
+        log.debug(f"choices : {choices}")
 
         return CompletionResponse(
             model=request.model, choices=choices, usage=UsageInfo.parse_obj(usage)
@@ -621,6 +624,16 @@ async def get_embedding(payload: Dict[str, Any]):
 
 
 if __name__ == "__main__":
+    # default logger
+    log = logging.getLogger()
+    log.setLevel(logging.INFO)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s - %(message)s')
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
+
+    ## Parse argument
     parser = argparse.ArgumentParser(
         description="FastChat ChatGPT-Compatible RESTful API server."
     )
@@ -641,7 +654,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--allowed-headers", type=json.loads, default=["*"], help="allowed headers"
     )
+    parser.add_argument(
+        "-d", "--debug", action='store_true', default=False, dest='debug', help='enable debug output'
+    )
     args = parser.parse_args()
+
+
+    if args.debug:
+        log = logging.getLogger()
+        log.setLevel(logging.DEBUG)
 
     app.add_middleware(
         CORSMiddleware,
