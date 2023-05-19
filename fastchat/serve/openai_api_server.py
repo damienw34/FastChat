@@ -301,6 +301,8 @@ async def create_chat_completion(request: ChatCompletionRequest):
         )
         return StreamingResponse(generator, media_type="text/event-stream")
 
+    log.debug(f"send request : {gen_params}")
+
     choices = []
     # TODO: batch the requests. maybe not necessary if using CacheFlow worker
     chat_completions = []
@@ -325,7 +327,7 @@ async def create_chat_completion(request: ChatCompletionRequest):
         task_usage = UsageInfo.parse_obj(content["usage"])
         for usage_key, usage_value in task_usage.dict().items():
             setattr(usage, usage_key, getattr(usage, usage_key) + usage_value)
-
+    log.debug(f"return choices : {choices}")
     return ChatCompletionResponse(model=request.model, choices=choices, usage=usage)
 
 
@@ -455,6 +457,8 @@ async def create_completion(request: CompletionRequest):
     if error_check_ret is not None:
         return error_check_ret
 
+    log.debug(f"send request : {payload}")
+
     if request.stream:
         generator = generate_completion_stream_generator(payload, request.n)
         return StreamingResponse(generator, media_type="text/event-stream")
@@ -485,6 +489,8 @@ async def create_completion(request: CompletionRequest):
             task_usage = UsageInfo.parse_obj(content["usage"])
             for usage_key, usage_value in task_usage.dict().items():
                 setattr(usage, usage_key, getattr(usage, usage_key) + usage_value)
+
+        log.debug(f"return choices : {choices}")
 
         return CompletionResponse(
             model=request.model, choices=choices, usage=UsageInfo.parse_obj(usage)
@@ -624,7 +630,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--allowed-headers", type=json.loads, default=["*"], help="allowed headers"
     )
+    parser.add_argument(
+        "-d", "--debug", action='store_true', default=False, dest='debug', help='enable debug output'
+    )
     args = parser.parse_args()
+
+    ## turn on DEBUG logging
+    if args.debug:
+        log = logging.getLogger()
+        log.setLevel(logging.DEBUG)
+
 
     app.add_middleware(
         CORSMiddleware,
